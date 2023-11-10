@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os/exec"
+	"strings"
 	// 	"strings"
 	// 	"github.com/aws/aws-lambda-go/lambda"
 	// 	"github.com/google/uuid"
@@ -787,6 +788,70 @@ func recommendation_python() string {
 	responseBody, err := ioutil.ReadAll(resp.Body)
 	return string(responseBody)
 }
+type CartItem struct {
+	ProductId string
+	Quantity  int32
+}
+
+func extractProductIDs(output string) []string {
+	// Split the string by space and remove empty strings
+	parts := strings.Fields(output)
+
+	// Filter out any unwanted characters such as '[' and ']'
+	var productIDs []string
+	for _, part := range parts {
+		cleanedPart := strings.Trim(part, "[]")
+		productIDs = append(productIDs, cleanedPart)
+	}
+
+	return productIDs
+}
+func (c *CartItem) String() string {
+	return fmt.Sprintf("ProductID: %s, Quantity: %d", c.ProductId, c.Quantity)
+}
+
+func getUserCart(userID string) (string) {
+	request := map[string]interface{}{
+		"requestType": "get",
+		"UserID":      userID,
+	}
+	requestData, err := json.Marshal(request)
+	if err != nil {
+		fmt.Println("Error marshaling JSON:", err)
+		return ""
+	}
+
+	jsonArg := string(requestData)
+	cmd := exec.Command("./cart/cart", jsonArg)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("Error executing CartService: %v\n", err)
+		return ""
+	}
+	//fmt.Printf("CartService output: %s\n", string(output))
+
+	// Extract product IDs from the output
+	outputString := string(output)
+	productIDs := extractProductIDs(outputString)
+	// for _, productID := range productIDs {
+	// 	fmt.Println(productID)
+	// }
+	var cartItems []*CartItem
+	for _, productID := range productIDs {
+		cartItem := &CartItem{
+			ProductId: productID,
+			Quantity:  3,
+		}
+		cartItems = append(cartItems, cartItem)
+	}
+	string_to_return := ""
+	for _, item := range cartItems {
+		string_to_return += "\n"
+		string_to_return += item.String()
+	}
+	return string_to_return
+}
+
 
 type MyEvent struct {
 	Call string `json:"call"`
@@ -812,6 +877,9 @@ func HandleLambdaEvent(myEvent MyEvent) (string, error) {
 	case "recommend":
 		result := recommendation_python()
 		return result, nil
+	case "cart":
+		result := getUserCart("1234")
+		return result,nil
 	default:
 		fmt.Println("Invalid")
 		return "Invalid", nil
