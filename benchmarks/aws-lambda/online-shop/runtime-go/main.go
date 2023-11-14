@@ -1,14 +1,16 @@
 package main
 
 import (
-	"github.com/aws/aws-lambda-go/lambda"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"os/exec"
 	"strings"
+
+	"github.com/aws/aws-lambda-go/lambda"
 	// 	"strings"
 	// 	"github.com/aws/aws-lambda-go/lambda"
 	// 	"github.com/google/uuid"
@@ -725,7 +727,7 @@ import (
 
 func checkout(jsonArg string) string {
 	fmt.Println(jsonArg)
-	cmd := exec.Command("./checkout/checkout", jsonArg)
+	cmd := exec.Command("./checkout/main", jsonArg)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Printf("Error executing CartService: %v\n", err)
@@ -840,7 +842,7 @@ func getUserCart(userID string) (string) {
 	for _, productID := range productIDs {
 		cartItem := &CartItem{
 			ProductId: productID,
-			Quantity:  3,
+			Quantity:  int32(rand.Intn(10)),
 		}
 		cartItems = append(cartItems, cartItem)
 	}
