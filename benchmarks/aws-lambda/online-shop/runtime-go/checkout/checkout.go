@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"github.com/google/uuid"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 type OrderResult struct {
@@ -232,7 +234,7 @@ func PlaceOrder(req *PlaceOrderRequest) (string, error) {
 	}
 	fmt.Println(string(jsonResp))
 	//fmt.Println(sendOrderConfirmation(req.Email, resp))
-	return sendOrderConfirmation(req.Email, resp),nil
+	return sendOrderConfirmation(req.Email, resp), nil
 
 }
 
@@ -348,7 +350,7 @@ func quoteShipping(address *Address, items []*CartItem) (*Money, error) {
 	}
 	jsonBody, _ := json.Marshal(data)
 	//fmt.Println(string(jsonBody))
-	cmd := exec.Command("./shipping/shipping", string(jsonBody))
+	cmd := exec.Command("./shipping/main", string(jsonBody))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Printf("Error executing CartService: %v\n", err)
@@ -397,7 +399,7 @@ func getUserCart(userID string) []*CartItem {
 	}
 
 	jsonArg := string(requestData)
-	cmd := exec.Command("./cart/cart", jsonArg)
+	cmd := exec.Command("./cart/main", jsonArg)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Printf("Error executing CartService: %v\n", err)
@@ -415,7 +417,7 @@ func getUserCart(userID string) []*CartItem {
 	for _, productID := range productIDs {
 		cartItem := &CartItem{
 			ProductId: productID,
-			Quantity:  3,
+			Quantity:  int32(rand.Intn(10)),
 		}
 		cartItems = append(cartItems, cartItem)
 	}
@@ -423,7 +425,7 @@ func getUserCart(userID string) []*CartItem {
 }
 
 // func emptyUserCart(var userID) {
-// 	resp := os.system(".../CartService " + json.dumps({requestType: "empty", UserId: userID}))
+// 	resp := os.system("..../CartService " + json.dumps({requestType: "empty", UserId: userID}))
 // 	return nil
 // }
 
@@ -448,7 +450,7 @@ func prepOrderItems(items []*CartItem, userCurrency string) ([]*OrderItem, error
 	for i, item := range items {
 		data := GetProductId(item)
 		//fmt.Println(string(data))
-		cmd := exec.Command("./productcatalog/productcatalog", string(data))
+		cmd := exec.Command("./productcatalog/main", string(data))
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			fmt.Printf("Error executing ProductCatalog: %v\n", err)
@@ -598,7 +600,7 @@ func chargeCard(amount *Money, paymentInfo *CreditCard) (string, error) {
 
 }
 
-func sendOrderConfirmation(email string, order *PlaceOrderResponse) (string){
+func sendOrderConfirmation(email string, order *PlaceOrderResponse) string {
 	data := map[string]interface{}{
 		"type": "email",
 		"data": map[string]interface{}{
@@ -670,7 +672,7 @@ func shipOrder(address *Address, items []*CartItem) (string, error) {
 	}
 	jsonBody, _ := json.Marshal(data)
 	//fmt.Println(string(jsonBody))
-	cmd := exec.Command("./shipping/shipping", string(jsonBody))
+	cmd := exec.Command("./shipping/main", string(jsonBody))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Printf("Error executing CartService: %v\n", err)
@@ -755,14 +757,14 @@ type CreditCardInfo struct {
 func main() {
 	jsonArg := os.Args[1]
 	var placeOrderRequest PlaceOrderRequest
-    if err := json.Unmarshal([]byte(jsonArg), &placeOrderRequest); err != nil {
-        fmt.Println("Error parsing JSON:", err)
-        return
-    }
+	if err := json.Unmarshal([]byte(jsonArg), &placeOrderRequest); err != nil {
+		fmt.Println("Error parsing JSON:", err)
+		return
+	}
 	if err := json.Unmarshal([]byte(jsonArg), &placeOrderRequest); err != nil {
 		fmt.Println("Error parsing JSON argument:", err)
 		return
 	}
-	string_output,_ := PlaceOrder(&placeOrderRequest)
+	string_output, _ := PlaceOrder(&placeOrderRequest)
 	fmt.Println(string_output)
 }
