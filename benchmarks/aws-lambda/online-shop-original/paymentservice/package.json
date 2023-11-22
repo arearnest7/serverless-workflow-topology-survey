@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "pino": "^8.15.6",
+    "simple-card-validator": "^1.1.0",
+    "uuid": "^9.0.1"
+  }
+}
