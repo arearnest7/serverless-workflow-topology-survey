@@ -76,7 +76,7 @@ function currencyFunction(eventBody) {
         //console.log(convert(input))
         return convert(input);
     } else if (input.requestType === 'supported') {
-        console.log(getSupportedCurrencies(input))
+        //console.log(getSupportedCurrencies(input))
         return getSupportedCurrencies(input);
     }
 }

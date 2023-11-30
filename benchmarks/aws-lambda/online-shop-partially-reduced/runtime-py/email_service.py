@@ -31,14 +31,14 @@ def send_email(email_address, content):
             "html_body": content
         }
     )
-    print("Message sent: {}".format(response["rfc822_message_id"]))
+    #print("Message sent: {}".format(response["rfc822_message_id"]))
     return content
 
 
 def SendOrderConfirmation(request):
     email = request["email"]
     order = request["order"]
-    print(order)
+    #print(order)
     try:
         confirmation = template.render(order=order)
     except TemplateError as err:

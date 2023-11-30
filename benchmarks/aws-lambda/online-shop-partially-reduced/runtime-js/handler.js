@@ -6,7 +6,7 @@ const payment = require('./payment.js');
 exports.handler = async (event) => {
     const request = event.body;
     const event_body = JSON.parse(request);
-    console.log(event_body)
+    //console.log(event_body)
     if (event_body["type"] === 'currency') {
         result = currency.currencyFunction(event_body["body"]);
         return result

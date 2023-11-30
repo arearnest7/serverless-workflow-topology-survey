@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 )
@@ -72,7 +71,7 @@ func createAdsMap() map[string][]Ad {
 func (lambda *AdServiceLambda) HandleRequest(input interface{}) string {
 	randomAd := lambda.getRandomAd()
 	adText := randomAd.Text
-	fmt.Println("Random Ad:", adText)
+	//fmt.Println("Random Ad:", adText)
 	return adText
 }
 

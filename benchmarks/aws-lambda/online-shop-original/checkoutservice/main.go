@@ -46,34 +46,11 @@ type CreditCardInfo struct {
 }
 
 
-func HandleLambdaEvent(event events.APIGatewayProxyRequest) (*pb.PlaceOrderResponse, error) {
-	fmt.Println("printing event")
-	//var myEvent MyEvent
+func HandleLambdaEvent(event events.APIGatewayProxyRequest) (string, error) {
 	var myEvent pb.PlaceOrderRequest
 	if err := json.Unmarshal([]byte(event.Body), &myEvent); err != nil {
-		fmt.Println("Error parsing event body:", err)
-		return nil,err
+		return "",err
 	}
-	// fmt.Println(event.Body)
-	// placeOrderRequest := &pb.PlaceOrderRequest{
-	// 	UserId:       myEvent.UserId,
-	// 	UserCurrency: myEvent.UserCurrency,
-	// 	Address: &pb.Address{
-	// 		StreetAddress: myEvent.Address.StreetAddress,
-	// 		City:          myEvent.Address.City,
-	// 		State:         myEvent.Address.State,
-	// 		Country:       myEvent.Address.Country,
-	// 		ZipCode:       myEvent.Address.ZipCode,
-	// 	},
-	// 	Email: myEvent.Email,
-	// 	CreditCard: &pb.CreditCardInfo{
-	// 		CreditCardNumber:          myEvent.CreditCard.CreditCardNumber,
-	// 		CreditCardCvv:             myEvent.CreditCard.CreditCardCvv,
-	// 		CreditCardExpirationYear:  myEvent.CreditCard.CreditCardExpirationYear,
-	// 		CreditCardExpirationMonth: myEvent.CreditCard.CreditCardExpirationMonth,
-	// 	},
-	// }
-	fmt.Println(myEvent);
 	result,_:= PlaceOrder(&myEvent)
     return result,nil
 } 
@@ -82,40 +59,15 @@ func main() {
     lambda.Start(HandleLambdaEvent)
 }
 
-// func printOrderPrep(prep orderPrep) {
-// 	fmt.Println("orderItems:")
-// 	for i, item := range prep.orderItems {
-// 		fmt.Printf("Order Item %d:\n", i+1)
-// 		fmt.Printf("  Item: %v\n", item.Item) // Assuming Item is a field within pb.OrderItem
-// 		fmt.Printf("  Cost: %v\n", item.Cost) // Assuming Cost is a field within pb.OrderItem
-// 	}
-
-// 	fmt.Println("cartItems:")
-// 	for i,item := range prep.cartItems {
-// 		fmt.Printf("Cart Item %d:\n", i+1)
-// 		fmt.Printf("  Item: %v\n", item.ProductId) // Assuming Item is a field within pb.OrderItem
-// 		fmt.Printf("  Cost: %v\n", item.Quantity) 
-// 		// Print fields of pb.CartItem if needed
-// 	}
-
-// 	fmt.Println("shippingCostLocalized:")
-// 	fmt.Printf("  Currency Code: %v\n", prep.shippingCostLocalized.CurrencyCode)
-// 	fmt.Printf("  Units: %v\n", prep.shippingCostLocalized.Units)
-// 	fmt.Printf("  Nanos: %v\n", prep.shippingCostLocalized.Nanos)
-// }
-
-
-func PlaceOrder(req *pb.PlaceOrderRequest) (*pb.PlaceOrderResponse, error) {
-	fmt.Print("Placeorder")
+func PlaceOrder(req *pb.PlaceOrderRequest) (string, error) {
 	orderID, err := uuid.NewUUID()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to generate order uuid")
+		return "", status.Errorf(codes.Internal, "failed to generate order uuid")
 	}
 	prep, err := prepareOrderItemsAndShippingQuoteFromCart(req.UserId, req.UserCurrency, req.Address)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return "", status.Errorf(codes.Internal, err.Error())
 	}
-	fmt.Print("prepareOrderItemsAndShippingQuoteFromCart...............Done")
 	total := pb.Money{CurrencyCode: req.UserCurrency,
 		Units: 0,
 		Nanos: 0}
@@ -124,18 +76,14 @@ func PlaceOrder(req *pb.PlaceOrderRequest) (*pb.PlaceOrderResponse, error) {
 		multPrice := money.MultiplySlow(*it.Cost, uint32(it.GetItem().GetQuantity()))
 		total = money.Must(money.Sum(total, multPrice))
 	}
-	fmt.Print("Totallllllll.....")
-	fmt.Println(total)
 	txID, err := chargeCard(&total, req.CreditCard)
-	fmt.Print("ChargeCard...............Done")
 	print(txID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to charge card: %+v", err)
+		return "", status.Errorf(codes.Internal, "failed to charge card: %+v", err)
 	}
 	shippingTrackingID, err := shipOrder(req.Address, prep.cartItems)
-	fmt.Print("ShipOrder...............Done")
 	if err != nil {
-		return nil, status.Errorf(codes.Unavailable, "shipping error: %+v", err)
+		return "", status.Errorf(codes.Unavailable, "shipping error: %+v", err)
 	}
 
 
@@ -148,7 +96,13 @@ func PlaceOrder(req *pb.PlaceOrderRequest) (*pb.PlaceOrderResponse, error) {
 	}
 
 	resp := &pb.PlaceOrderResponse{Order: orderResult}
-	return resp, nil
+	jsonResp, err := json.Marshal(resp)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println(string(jsonResp))
+	fmt.Println(sendOrderConfirmation(req.Email, resp))
+	return txID+string(string(jsonResp))+sendOrderConfirmation(req.Email, resp), nil
 }
 
 type orderPrep struct {
@@ -167,13 +121,13 @@ func prepareOrderItemsAndShippingQuoteFromCart(userID, userCurrency string, addr
 	if err != nil {
 		return out, fmt.Errorf("failed to prepare order: %+v", err)
 	}
-	fmt.Println("Qutote Shipping Function...")
+	//fmt.Println("Qutote Shipping Function...")
 	shippingUSD, err := quoteShipping(address, cartItems)
 	if err != nil {
 		return out, fmt.Errorf("shipping quote failure: %+v", err)
 	}
-	fmt.Print("ShippingUSD:")
-	fmt.Println(shippingUSD)
+	//fmt.Print("ShippingUSD:")
+	//fmt.Println(shippingUSD)
 
 	shippingPrice, err := convertCurrency(shippingUSD, userCurrency)
 	if err != nil {
@@ -254,11 +208,11 @@ func  quoteShipping(address *pb.Address, items []*pb.CartItem) (*pb.Money, error
 	
     err = json.Unmarshal([]byte(jsonStr), &response)
     if err != nil {
-        fmt.Println("Error:", err)
+        //fmt.Println("Error:", err)
         return nil,err
     }
     getQuoteResponse := response.GetQuoteResponse
-    fmt.Printf("Currency Code: %s, Units: %d, Nanos: %d\n", getQuoteResponse.CostUSD.CurrencyCode, getQuoteResponse. CostUSD.Units, getQuoteResponse.CostUSD.Nanos)
+    //fmt.Printf("Currency Code: %s, Units: %d, Nanos: %d\n", getQuoteResponse.CostUSD.CurrencyCode, getQuoteResponse. CostUSD.Units, getQuoteResponse.CostUSD.Nanos)
 	resultMoney := &pb.Money{
 		CurrencyCode: getQuoteResponse.CostUSD.CurrencyCode,
 		Units:        getQuoteResponse.CostUSD.Units,
@@ -270,8 +224,6 @@ func  quoteShipping(address *pb.Address, items []*pb.CartItem) (*pb.Money, error
 
 func getUserCart(userID string) ([]*pb.CartItem, error) {
 	apiURL := "https://c60ekgpu4l.execute-api.us-east-2.amazonaws.com/default/cartservice"
-
-	// JSON data to send in the request body
 	data := map[string]interface{}{
 		"userID": userID,
 	}
@@ -283,7 +235,7 @@ func getUserCart(userID string) ([]*pb.CartItem, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println("Error making the request:", err)
+		//fmt.Println("Error making the request:", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -291,7 +243,7 @@ func getUserCart(userID string) ([]*pb.CartItem, error) {
 	// Read the response body
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Error reading response body:", err)
+		//fmt.Println("Error reading response body:", err)
 		return nil, err
 	}
 
@@ -299,10 +251,10 @@ func getUserCart(userID string) ([]*pb.CartItem, error) {
 	var productIDs []string
 	err = json.Unmarshal(body, &productIDs)
 	if err != nil {
-		fmt.Println("Error unmarshaling JSON:", err)
+		//fmt.Println("Error unmarshaling JSON:", err)
 		return nil, err
 	}
-	fmt.Print(productIDs)
+	//t(productIDs)
 	var cartItems []*pb.CartItem
 	for _, productID := range productIDs {
 		cartItem := &pb.CartItem{
@@ -331,7 +283,6 @@ func  GetProductId(m *pb.CartItem) string {
 	return ""
 }
 func  prepOrderItems(items []*pb.CartItem, userCurrency string) ([]*pb.OrderItem, error) {
-	fmt.Print("preppppppiiinnggg")
 	out := make([]*pb.OrderItem, len(items))
 
 	apiURL := "https://o346ng6ah7.execute-api.us-east-2.amazonaws.com/default/productcatalog"
@@ -350,14 +301,14 @@ func  prepOrderItems(items []*pb.CartItem, userCurrency string) ([]*pb.OrderItem
 		client := &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
-			fmt.Println("Error making the request:", err)
+			//tln("Error making the request:", err)
 			return nil, err
 		}
 		defer resp.Body.Close()
 		// Read the response body
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			fmt.Println("Error reading response body:", err)
+			//fmt.Println("Error reading response body:", err)
 			return nil, err
 		}
 		var response map[string]interface{}
@@ -368,14 +319,12 @@ func  prepOrderItems(items []*pb.CartItem, userCurrency string) ([]*pb.OrderItem
 		bodyJSON, _ := response["body"].(string)
 		var bodyData map[string]interface{}
 		if err := json.Unmarshal([]byte(bodyJSON), &bodyData); err != nil {
-			fmt.Println("Error parsing 'body' as JSON:", err)
+			//fmt.Println("Error parsing 'body' as JSON:", err)
 			return nil, err
 		}
 
-		// Create an instance of pb.Product
 		product := &pb.Product{}
 
-		// Assign values from bodyData
 		product.Id = bodyData["id"].(string)
 		product.Name = bodyData["name"].(string)
 		product.Description = bodyData["description"].(string)
@@ -398,12 +347,6 @@ func  prepOrderItems(items []*pb.CartItem, userCurrency string) ([]*pb.OrderItem
 		}
 		product.Categories = categories
 
-		// Now, 'product' contains the values from 'bodyData'
-		fmt.Println("Product:")
-		fmt.Println(product)
-
-		fmt.Println("getPriceOutput")
-		fmt.Print(GetPriceUsd(product))
 		price, err := convertCurrency(GetPriceUsd(product), userCurrency)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert price of %q to %s", item.GetProductId(), userCurrency)
@@ -423,7 +366,7 @@ func convertCurrency(from *pb.Money, toCurrency string) (*pb.Money, error) {
 		"nanos": from.Nanos,
 		"to_code": toCurrency,
 	}
-	jsonData, err := json.Marshal(data)
+	jsonData, _ := json.Marshal(data)
 	result, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
 		if err != nil {
 			return nil, fmt.Errorf("failed to get product")
@@ -463,34 +406,59 @@ func chargeCard(amount *pb.Money, paymentInfo *pb.CreditCardInfo) (string, error
 		},
 	}	
 
-	jsonData, err := json.Marshal(data)
-	result, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
-		if err != nil {
-			return "failed to get product",err
-		}
-	responseBody, err := ioutil.ReadAll(result.Body)
-	if err != nil {
-		return "failed to read response body",err
-	}
-	
-	return string(responseBody),nil
+	jsonData, _ := json.Marshal(data)
+	fmt.Print("Value is being sent")
+	fmt.Println(string(jsonData))
+	result, _ := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
+	result.Header.Set("Content-Type", "application/json")
+	httpClient := &http.Client{}
+	resp, _ := httpClient.Do(result)
+	defer resp.Body.Close()
+
+	responseBody, _ := ioutil.ReadAll(resp.Body)
+
+	htmlResponse := string(responseBody)
+	return htmlResponse,nil
 }
 
-func sendOrderConfirmation(email string, order *pb.OrderResult) error {
-	apiURL := "https://jhb3c8jd75.execute-api.us-east-2.amazonaws.com/default/email"
+func sendOrderConfirmation(email string, order *pb.PlaceOrderResponse) string {
 	data := map[string]interface{}{
 		"email": email,
-		"order": order.OrderId,
+		"order": map[string]interface{}{
+			"order_id":             order.Order.OrderId,
+			"shipping_tracking_id": order.Order.ShippingTrackingId,
+			"shipping_cost": map[string]interface{}{
+				"units":         order.Order.ShippingCost.Units,
+				"nanos":         order.Order.ShippingCost.Nanos,
+				"currency_code": order.Order.ShippingCost.CurrencyCode,
+			},
+			"shipping_address": map[string]interface{}{
+				"street_address_1": order.Order.ShippingAddress.StreetAddress,
+				"street_address_2": "",
+				"city":             order.Order.ShippingAddress.City,
+				"country":          order.Order.ShippingAddress.Country,
+				"zip_code":         order.Order.ShippingAddress.ZipCode,
+			},
+			"items": order.Order.Items,
+		},
 	}
-	jsonData, err := json.Marshal(data)
-	result, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
-		if err != nil {
-			return err
-		}
-	responseBody, err := ioutil.ReadAll(result.Body)
-	fmt.Printf("Response Body: %s\n", responseBody)
-	return err
+	requestData, _ := json.Marshal(data)
+	httpClient := &http.Client{}
+	url := "https://tsvhk254jrn6hfqz7jo62wcufi0rmxzr.lambda-url.us-east-2.on.aws/"
+	buf := bytes.NewBuffer(requestData)
+	result, _ := http.NewRequest("POST", url, buf)
+
+	result.Header.Set("Content-Type", "application/json")
+	resp, _ := httpClient.Do(result)
+	defer resp.Body.Close()
+
+	responseBody, _ := ioutil.ReadAll(resp.Body)
+
+	htmlResponse := string(responseBody)
+	//fmt.Println(htmlResponse)
+	return htmlResponse
 }
+
 
 func  shipOrder(address *pb.Address, items []*pb.CartItem) (string, error) {
 	apiURL := "https://tekw7om46d.execute-api.us-east-2.amazonaws.com/default/shipping"

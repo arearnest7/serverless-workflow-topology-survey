@@ -1,8 +1,7 @@
 FROM public.ecr.aws/lambda/python:3.9 as authPythonLambda
 
+COPY . ${LAMBDA_TASK_ROOT}
 
-COPY tracing.py ${LAMBDA_TASK_ROOT}
-COPY server.py ${LAMBDA_TASK_ROOT}
 
 COPY requirements.txt ./requirements.txt
 
