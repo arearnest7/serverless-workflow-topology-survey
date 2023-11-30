@@ -1,6 +1,6 @@
 const cardValidator = require('simple-card-validator');
 const pino = require('pino');
-const uuid = require('uuid/v4');
+const uuid = require('uuid');
 const logger = pino({
   name: 'paymentservice-charge',
   messageKey: 'message',
@@ -48,7 +48,7 @@ function charge (request) {
     card_type: cardType,
     valid
   } = cardInfo.getCardDetails();
-  console.log(cardInfo.getCardDetails)
+  //console.log(cardInfo.getCardDetails)
   if (!valid) { throw new InvalidCreditCard(); }
 
   // Only VISA and mastercard is accepted, other card types (AMEX, dinersclub) will
@@ -72,7 +72,7 @@ exports.handler = async function (event, context) {
   try {
     // Parse the input event, assuming it's a JSON object
     const requestBody = event ;
-    console.log(event);
+    //console.log(event);
     
     // Call the charge function with the parsed request
     const result = charge(requestBody);

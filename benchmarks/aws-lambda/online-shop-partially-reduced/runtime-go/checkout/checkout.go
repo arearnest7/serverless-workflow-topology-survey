@@ -176,12 +176,6 @@ func PlaceOrder(req *PlaceOrderRequest) (string, error) {
 	}
 
 	prep, _ := prepareOrderItemsAndShippingQuoteFromCart(req.UserId, req.UserCurrency, address)
-	//shippingCostJSON, err := json.Marshal(prep.shippingCostLocalized)
-	// if err != nil {
-	// 	fmt.Println("Error marshaling Money to JSON:", err)
-	// 	return
-	// }
-	//fmt.Printf("Shipping Cost (USD) as JSON: %s\n", string(shippingCostJSON))
 	total := Money{CurrencyCode: req.UserCurrency,
 		Units: 0,
 		Nanos: 0}
@@ -190,16 +184,12 @@ func PlaceOrder(req *PlaceOrderRequest) (string, error) {
 		Units:        prep.shippingCostLocalized.Units,
 		Nanos:        prep.shippingCostLocalized.Nanos,
 	}
-	// moneyStr := fmt.Sprintf("{ currency_code: '%s', units: %d, nanos: %d }", shippingCost.CurrencyCode, shippingCost.Units,shippingCost.Nanos)
-	// fmt.Printf("Total amount: %s\n", moneyStr)
 	total, _ = Sum(total, shippingCost)
 
 	for _, it := range prep.orderItems {
 		multPrice := MultiplySlow(*it.Cost, uint32(it.Item.Quantity))
 		total = Must(Sum(total, multPrice))
 	}
-	// moneyStr := fmt.Sprintf("{ currency_code: '%s', units: %d, nanos: %d }", total.CurrencyCode, total.Units, total.Nanos)
-	// fmt.Printf("Total amount: %s\n", moneyStr)
 	creditCard := &CreditCard{
 		CreditCardNumber:          req.CreditCard.CreditCardNumber,
 		CreditCardCvv:             int32(req.CreditCard.CreditCardCvv),
@@ -229,11 +219,11 @@ func PlaceOrder(req *PlaceOrderRequest) (string, error) {
 	resp := &PlaceOrderResponse{Order: orderResult}
 	jsonResp, err := json.Marshal(resp)
 	if err != nil {
-		fmt.Println("Error marshaling JSON:", err)
+		//fmt.Println("Error marshaling JSON:", err)
 		return "", err
 	}
 	fmt.Println(string(jsonResp))
-	//fmt.Println(sendOrderConfirmation(req.Email, resp))
+	fmt.Println(sendOrderConfirmation(req.Email, resp))
 	return sendOrderConfirmation(req.Email, resp), nil
 
 }
@@ -351,18 +341,10 @@ func quoteShipping(address *Address, items []*CartItem) (*Money, error) {
 	jsonBody, _ := json.Marshal(data)
 	//fmt.Println(string(jsonBody))
 	cmd := exec.Command("./shipping/main", string(jsonBody))
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Printf("Error executing CartService: %v\n", err)
-		//return nil
-	}
+	output, _ := cmd.CombinedOutput()
 	//fmt.Printf("Shipping: %s\n", output)
 	var response QuoteResponse
-	err = json.Unmarshal([]byte(output), &response)
-	if err != nil {
-		fmt.Println("Error:", err)
-		//return nil,err
-	}
+	_ = json.Unmarshal([]byte(output), &response)
 	getQuoteResponse := response.GetQuoteResponse
 	//fmt.Printf("Currency Code: %s, Units: %d, Nanos: %d\n", getQuoteResponse.CostUSD.CurrencyCode, getQuoteResponse. CostUSD.Units, getQuoteResponse.CostUSD.Nanos)
 	resultMoney := &Money{
@@ -394,7 +376,7 @@ func getUserCart(userID string) []*CartItem {
 	}
 	requestData, err := json.Marshal(request)
 	if err != nil {
-		fmt.Println("Error marshaling JSON:", err)
+		//fmt.Println("Error marshaling JSON:", err)
 		return nil
 	}
 
@@ -402,7 +384,7 @@ func getUserCart(userID string) []*CartItem {
 	cmd := exec.Command("./cart/main", jsonArg)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("Error executing CartService: %v\n", err)
+		//fmt.Printf("Error executing CartService: %v\n", err)
 		return nil
 	}
 	//fmt.Printf("CartService output: %s\n", string(output))
@@ -451,17 +433,9 @@ func prepOrderItems(items []*CartItem, userCurrency string) ([]*OrderItem, error
 		data := GetProductId(item)
 		//fmt.Println(string(data))
 		cmd := exec.Command("./productcatalog/main", string(data))
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Error executing ProductCatalog: %v\n", err)
-			//return nil,err
-		}
+		output, _ := cmd.CombinedOutput()
 		product := &Product{}
-		err = json.Unmarshal(output, product)
-		if err != nil {
-			fmt.Println("Error marshaling PriceUsd:", err)
-			return nil, err
-		}
+		_ = json.Unmarshal(output, product)
 		// Print the JSON representation of the PriceUsd field
 		// fmt.Println("productcatalog")
 		// fmt.Println("Product Price (USD):", string(output))
@@ -499,25 +473,16 @@ func convertCurrency(from *Money, toCurrency string) (*Money, error) {
 	}
 	requestData, err := json.Marshal(data)
 	if err != nil {
-		fmt.Println("Error marshaling JSON:", err)
+		//fmt.Println("Error marshaling JSON:", err)
 		return nil, err
 	}
-	//fmt.Println("Conversion NodeJS")
-	//fmt.Println(string(requestData))
-	//fmt.Println(string(requestData))
-	// cmd := exec.Command("node", "currency.js", string(requestData))
-	// output, err := cmd.CombinedOutput()
-	// if err != nil {
-	// 	fmt.Printf("Error executing Currency: %v\n", err)
-	// 	return nil, err
-	// }
 	httpClient := &http.Client{}
 	//fmt.Println(string(requestData))
 	url := "https://ofyvg75rl4vlqxhfjwc6adf73y0johle.lambda-url.us-east-2.on.aws/"
 	buf := bytes.NewBuffer(requestData)
 	result, err := http.NewRequest("POST", url, buf)
 	if err != nil {
-		fmt.Println("Error creating request:", err)
+		//fmt.Println("Error creating request:", err)
 		return nil, err
 	}
 	if err != nil {
@@ -577,7 +542,7 @@ func chargeCard(amount *Money, paymentInfo *CreditCard) (string, error) {
 	}
 	requestData, err := json.Marshal(data)
 	if err != nil {
-		fmt.Println("Error marshaling JSON:", err)
+		//fmt.Println("Error marshaling JSON:", err)
 		return "", err
 	}
 	httpClient := &http.Client{}
@@ -586,7 +551,7 @@ func chargeCard(amount *Money, paymentInfo *CreditCard) (string, error) {
 	buf := bytes.NewBuffer(requestData)
 	result, err := http.NewRequest("POST", url, buf)
 	if err != nil {
-		fmt.Println("Error creating request:", err)
+		//fmt.Println("Error creating request:", err)
 		return "", err
 	}
 	result.Header.Set("Content-Type", "application/json")
@@ -625,24 +590,17 @@ func sendOrderConfirmation(email string, order *PlaceOrderResponse) string {
 		},
 	}
 	requestData, _ := json.Marshal(data)
-	fmt.Println(string(requestData))
+	//.Println(string(requestData))
 	httpClient := &http.Client{}
 	//fmt.Println(string(requestData))
 	url := "https://bmk46xska6uzj4hhlwpcnhrdsi0osfnf.lambda-url.us-east-2.on.aws/"
 	buf := bytes.NewBuffer(requestData)
-	result, err := http.NewRequest("POST", url, buf)
-	if err != nil {
-		fmt.Println("Error creating request:", err)
-	}
+	result, _:= http.NewRequest("POST", url, buf)
 	result.Header.Set("Content-Type", "application/json")
 	resp, _ := httpClient.Do(result)
 	defer resp.Body.Close()
 
-	responseBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println("Error reading response body:", err)
-	}
-
+	responseBody, _ := ioutil.ReadAll(resp.Body)
 	htmlResponse := string(responseBody)
 	//fmt.Println(htmlResponse)
 	return htmlResponse
@@ -673,11 +631,7 @@ func shipOrder(address *Address, items []*CartItem) (string, error) {
 	jsonBody, _ := json.Marshal(data)
 	//fmt.Println(string(jsonBody))
 	cmd := exec.Command("./shipping/main", string(jsonBody))
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Printf("Error executing CartService: %v\n", err)
-		//return nil
-	}
+	output, _ := cmd.CombinedOutput()
 	//fmt.Println(string(output))
 	var ship struct {
 		ShipOrderResponse struct {

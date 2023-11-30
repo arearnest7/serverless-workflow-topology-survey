@@ -57,8 +57,8 @@ func main() {
 }
 
 func GetQuote(in *pb.GetQuoteRequest) (*pb.GetQuoteResponse, error) {
-	print("[GetQuote] received request")
-	print("[GetQuote] completed request")
+	//print("[GetQuote] received request")
+	//print("[GetQuote] completed request")
 
 	// 1. Generate a quote based on the total number of items to be shipped.
 	quote := CreateQuoteFromCount(0)
@@ -76,7 +76,7 @@ func GetQuote(in *pb.GetQuoteRequest) (*pb.GetQuoteResponse, error) {
 // ShipOrder mocks that the requested items will be shipped.
 // It supplies a tracking ID for notional lookup of shipment delivery status.
 func  ShipOrder(in *pb.ShipOrderRequest) (*pb.ShipOrderResponse, error) {
-	print("[ShipOrder] received request")
+	//print("[ShipOrder] received request")
 	// 1. Create a Tracking ID
 	baseAddress := fmt.Sprintf("%s, %s, %s", in.Address.StreetAddress, in.Address.City, in.Address.State)
 	id := CreateTrackingId(baseAddress)

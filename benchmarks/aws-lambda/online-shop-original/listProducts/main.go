@@ -76,7 +76,7 @@ func main() {
 func readCatalogFile(catalog *ListProductsResponse) error {
 	catalogJSON, err := ioutil.ReadFile("products.json")
 	if err != nil {
-		print("Error in reading file")
+		return err
 	}
 
 	if err := json.Unmarshal([]byte(catalogJSON), catalog); err != nil {
@@ -96,7 +96,7 @@ type SearchProductsResponse struct {
 
 }
 func SearchProducts(req *SearchProductsRequest) (*SearchProductsResponse) {
-	print(req.Query)
+	//print(req.Query)
 	var ps []*Product
 	for _, p := range parseCatalog() {
 		if strings.Contains(strings.ToLower(p.Name), strings.ToLower(req.Query)) ||

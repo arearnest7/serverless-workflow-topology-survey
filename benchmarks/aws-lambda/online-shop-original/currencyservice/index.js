@@ -36,7 +36,7 @@ function convert (request) {
         nanos: request.nanos / _getCurrencyData(from_code)
       });
       euros.nanos = Math.round(euros.nanos);
-      console.log(euros.nanos);
+      //console.log(euros.nanos);
       // Convert: EUR --> to_currency
       const result = _carry({
         units: euros.units * data[request.to_code],
@@ -55,8 +55,8 @@ exports.handler = async function (event, context) {
   try {
     // Parse the input event, assuming it's a JSON object
     const requestBody = event ;
-    console.log(event);
-    console.log(event.currency_code);
+    // console.log(event);
+    // console.log(event.currency_code);
     
     // Call the charge function with the parsed request
     const result = convert(requestBody);

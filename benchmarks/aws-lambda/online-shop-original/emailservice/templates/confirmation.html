@@ -37,17 +37,20 @@
     <h3>Items</h3>
     <table style="width:100%">
         <tr>
-          <th>Item No.</th>
-          <th>Quantity</th> 
-          <th>Price</th>
+            <th>Item No.</th>
+            <th>Quantity</th>
+            <th>Price</th>
         </tr>
+        {% if order.items is defined and order.items is iterable %}
         {% for item in order.items %}
         <tr>
-          <td>#{{ item.item.product_id }}</td>
-          <td>{{ item.item.quantity }}</td> 
-          <td>{{ item.cost.units }}.{{ "%02d" | format(item.cost.nanos // 10000000) }} {{ item.cost.currency_code }}</td>
+            <td>#{{ item.product_id }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.cost.units }}.{{ "%02d" | format(item.cost.nanos // 10000000) }} {{ item.cost.currency_code }}</td>
         </tr>
         {% endfor %}
+        {% endif %}
     </table>
+    
   </body>
 </html>

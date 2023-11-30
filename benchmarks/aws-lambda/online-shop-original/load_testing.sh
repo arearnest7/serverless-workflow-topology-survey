@@ -1,0 +1,4 @@
+hey  -o csv -n 2500 -c 1 -d  '{"call": "cart","body": ""}' https://l7vqjvcteh375db5hw5hftd5oe0zlsyh.lambda-url.us-east-2.on.aws/ > cart.csv
+hey  -o csv -n 2500 -c 1 -d '{"call": "list","body": ""}' https://l7vqjvcteh375db5hw5hftd5oe0zlsyh.lambda-url.us-east-2.on.aws/  > list.csv
+hey  -o csv -n 2500 -c 1 -d '{"call": "ad","body": ""}' https://l7vqjvcteh375db5hw5hftd5oe0zlsyh.lambda-url.us-east-2.on.aws/ > ad.csv
+hey -o csv -n 2500 -c 1 -d '{"call": "checkout","body": "{\"user_id\":\"12345\",\"user_currency\":\"USD\",\"address\":{\"street_address\":\"123 Main St\",\"city\":\"Exampleville\",\"state\":\"CA\",\"country\":\"USA\",\"zip_code\":90210},\"email\":\"user@example.com\",\"credit_card\":{\"credit_card_number\":\"4111111111111111\",\"credit_card_cvv\":123,\"credit_card_expiration_year\":2025,\"credit_card_expiration_month\":12}}"}' https://l7vqjvcteh375db5hw5hftd5oe0zlsyh.lambda-url.us-east-2.on.aws/ > checkout.csv

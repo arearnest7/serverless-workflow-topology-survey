@@ -16,7 +16,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"strings"
 
@@ -39,7 +38,7 @@ type MyEvent struct {
 
 func HandleLambdaEvent(request MyEvent)(events.APIGatewayProxyResponse, error) {
 	inputData := request.Type
-	fmt.Println(inputData)
+	//fmt.Println(inputData)
 	var response interface{}
 	var err error
 	switch inputData {
@@ -89,11 +88,11 @@ func main() {
 func readCatalogFile(catalog *pb.ListProductsResponse) error {
 	catalogJSON, err := ioutil.ReadFile("products.json")
 	if err!=nil{
-		print("Error in reading file")
+		return err
 	}
 
     if err := json.Unmarshal([]byte(catalogJSON), catalog); err != nil {
-        fmt.Println("Failed to parse the catalog JSON:", err)
+        //fmt.Println("Failed to parse the catalog JSON:", err)
         return err
     }
     return nil
@@ -116,27 +115,27 @@ func parseCatalog() []*pb.Product {
 
 
 func ListProducts(*pb.Empty) *pb.ListProductsResponse {
-    for _, product := range parseCatalog() {
-        fmt.Printf("Product ID: %s\n", product.Id)
-        fmt.Printf("Name: %s\n", product.Name)
-        fmt.Printf("Description: %s\n", product.Description)
-        fmt.Printf("PriceUSD: %+v\n", product.PriceUsd) // Print PriceUSD
-        // Print other product fields as needed
-        fmt.Println("------------------------")
-    }
+    // for _, product := range parseCatalog() {
+    //     fmt.Printf("Product ID: %s\n", product.Id)
+    //     fmt.Printf("Name: %s\n", product.Name)
+    //     fmt.Printf("Description: %s\n", product.Description)
+    //     fmt.Printf("PriceUSD: %+v\n", product.PriceUsd) // Print PriceUSD
+    //     // Print other product fields as needed
+    //     fmt.Println("------------------------")
+    // }
     return &pb.ListProductsResponse{Products: parseCatalog()}
 }
 
 func  GetProduct(req *pb.GetProductRequest) (*pb.Product) {
 	var found *pb.Product
 	found_value := 0
-	print(len(parseCatalog()))
+	//print(len(parseCatalog()))
 	for i := 0; i < len(parseCatalog()); i++ {
-		print(parseCatalog()[i].Id)
+		//(parseCatalog()[i].Id)
 		if req.Id == parseCatalog()[i].Id {
 			found_value = 1
 			found = parseCatalog()[i]
-			fmt.Printf("PriceUSD: %+v\n", found.PriceUsd)
+			//fmt.Printf("PriceUSD: %+v\n", found.PriceUsd)
 		}
 	}
 	if found_value ==1 {
@@ -149,7 +148,7 @@ func  GetProduct(req *pb.GetProductRequest) (*pb.Product) {
 }
 
 func SearchProducts(req *pb.SearchProductsRequest) (*pb.SearchProductsResponse) {
-	print(req.Query)
+	//print(req.Query)
 	var ps []*pb.Product
 	for _, p := range parseCatalog() {
 		if strings.Contains(strings.ToLower(p.Name), strings.ToLower(req.Query)) ||
