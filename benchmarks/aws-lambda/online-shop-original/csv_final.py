@@ -7,7 +7,7 @@ file_list = ['./checkout.csv']
 combined_data = pd.concat([pd.read_csv(file) for file in file_list])
 
 # Adding 'original_' prefix to column names
-combined_data.columns = ['original_' + col for col in combined_data.columns]
+combined_data.columns = ['original__checkout_' + col for col in combined_data.columns]
 
 # Write the combined data to a new CSV file
 combined_data.to_csv('original_checkout.csv', index=False)

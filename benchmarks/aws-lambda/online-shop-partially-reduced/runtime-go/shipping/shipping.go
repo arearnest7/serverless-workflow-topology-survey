@@ -71,7 +71,7 @@ func main() {
         GetQuoteResponse:  quoteResponse,
     }
     jsonResponse, _:= json.Marshal(response)
-    fmt.Printf(string(jsonResponse))
+    fmt.Print(string(jsonResponse))
 }
 
 type Quote struct {
@@ -89,10 +89,7 @@ func CreateQuoteFromCount(count int) Quote {
 	return CreateQuoteFromFloat(8.99)
 }
 func GetQuote(in *GetQuoteRequest) (*GetQuoteResponse, error) {
-	// 1. Generate a quote based on the total number of items to be shipped.
 	quote := CreateQuoteFromCount(0)
-
-	// 2. Generate a response.
 	return &GetQuoteResponse{
 		CostUsd: &Money{
 			CurrencyCode: "USD",

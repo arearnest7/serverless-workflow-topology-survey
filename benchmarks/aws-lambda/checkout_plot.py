@@ -17,7 +17,22 @@ column2_name = 'partial_checkout_response-time'  # Replace with the column name 
 
 data2 = pd.read_csv(file2)
 column2 = data2[column2_name]
+avg_latency_file1 = column1.mean()
+percentile_99_latency_file1 = column1.quantile(0.99)
 
+print(f'Original Checkout - Average latency: {avg_latency_file1}')
+print(f'Original Checkout - 99th percentile latency: {percentile_99_latency_file1}')
+
+
+data2 = pd.read_csv(file2)
+column2 = data2[column2_name]
+
+# Calculate average and 99th percentile latency for file2
+avg_latency_file2 = column2.mean()
+percentile_99_latency_file2 = column2.quantile(0.99)
+
+print(f'\nPartial Checkout- Average latency: {avg_latency_file2}')
+print(f'Partial Checkout- 99th percentile latency: {percentile_99_latency_file2}')
 # Downsample the data - Example: taking every 10th data point
 downsampled_column2 = column2[::10]  # Adjust the sampling rate as needed
 

@@ -5,14 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
+)
 
-	"github.com/google/uuid"
+const (
+	usdCurrency = "USD"
 )
 
 type OrderResult struct {
@@ -164,68 +169,62 @@ type Cart struct {
 	Items  []*CartItem `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
 }
 
+func GetItem(m *OrderItem) *CartItem {
+	if m != nil {
+		return m.Item
+	}
+	return nil
+}
+
+func GetQuantity(m *CartItem) int32 {
+	if m != nil {
+		return m.Quantity
+	}
+	return 0
+}
 func PlaceOrder(req *PlaceOrderRequest) (string, error) {
-	orderID, _ := uuid.NewUUID()
-	//fmt.Print(orderID.String())
-	address := Address{
-		StreetAddress: req.Address.StreetAddress,
-		City:          req.Address.City,
-		State:         req.Address.State,
-		Country:       req.Address.Country,
-		ZipCode:       req.Address.ZipCode,
+	orderID, err := uuid.NewUUID()
+	if err != nil {
+		return "", status.Errorf(codes.Internal, "failed to generate order uuid")
 	}
 
-	prep, _ := prepareOrderItemsAndShippingQuoteFromCart(req.UserId, req.UserCurrency, address)
+	prep, err := prepareOrderItemsAndShippingQuoteFromCart(req.UserId, req.UserCurrency, *req.Address)
+	if err != nil {
+		return "", status.Errorf(codes.Internal, err.Error())
+	}
 	total := Money{CurrencyCode: req.UserCurrency,
 		Units: 0,
 		Nanos: 0}
-	shippingCost := Money{
-		CurrencyCode: prep.shippingCostLocalized.CurrencyCode,
-		Units:        prep.shippingCostLocalized.Units,
-		Nanos:        prep.shippingCostLocalized.Nanos,
-	}
-	total, _ = Sum(total, shippingCost)
-
+	total = Must(Sum(total, *prep.shippingCostLocalized))
 	for _, it := range prep.orderItems {
-		multPrice := MultiplySlow(*it.Cost, uint32(it.Item.Quantity))
+		multPrice := MultiplySlow(*it.Cost, uint32(GetQuantity(GetItem(it))))
 		total = Must(Sum(total, multPrice))
 	}
-	creditCard := &CreditCard{
-		CreditCardNumber:          req.CreditCard.CreditCardNumber,
-		CreditCardCvv:             int32(req.CreditCard.CreditCardCvv),
-		CreditCardExpirationYear:  int32(req.CreditCard.CreditCardExpirationYear),
-		CreditCardExpirationMonth: req.CreditCard.CreditCardExpirationMonth,
-	}
-	// fmt.Println("Credit card")
-	// fmt.Print(creditCard)
-	txID, err := chargeCard(&total, creditCard)
-	fmt.Println(txID)
+	txID, err := chargeCard(&total, (*CreditCard)(req.CreditCard))
 	if err != nil {
-		return "", err
+		return "", status.Errorf(codes.Internal, "failed to charge card: %+v", err)
 	}
-	shippingTrackingID, err := shipOrder(&address, prep.cartItems)
+	shippingTrackingID, err := shipOrder(req.Address, prep.cartItems)
 	if err != nil {
-		return "", err
+		return "", status.Errorf(codes.Unavailable, "shipping error: %+v", err)
 	}
-	//fmt.Println(shippingTrackingID)
+
 	orderResult := &OrderResult{
 		OrderId:            orderID.String(),
 		ShippingTrackingId: shippingTrackingID,
 		ShippingCost:       prep.shippingCostLocalized,
-		ShippingAddress:    &address,
+		ShippingAddress:    req.Address,
 		Items:              prep.orderItems,
 	}
 
-	resp := &PlaceOrderResponse{Order: orderResult}
+	resp := PlaceOrderResponse{Order: orderResult}
 	jsonResp, err := json.Marshal(resp)
 	if err != nil {
-		//fmt.Println("Error marshaling JSON:", err)
 		return "", err
 	}
 	fmt.Println(string(jsonResp))
-	fmt.Println(sendOrderConfirmation(req.Email, resp))
-	return sendOrderConfirmation(req.Email, resp), nil
-
+	fmt.Println(sendOrderConfirmation(req.Email, &resp))
+	return txID + string(string(jsonResp)) + sendOrderConfirmation(req.Email, &resp), nil
 }
 
 type OrderItem struct {
@@ -249,11 +248,12 @@ type Money struct {
 }
 
 type Product struct {
-	Id          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Picture     string `json:"picture"`
-	PriceUsd    *Money `json:"price_usd"`
+	Id          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Picture     string   `json:"picture"`
+	PriceUsd    *Money   `json:"price_usd"`
+	Categories  []string `json:"categories"`
 }
 
 func (c *CartItem) String() string {
@@ -262,44 +262,25 @@ func (c *CartItem) String() string {
 
 func prepareOrderItemsAndShippingQuoteFromCart(userID string, userCurrency string, address Address) (orderPrep, error) {
 	var out orderPrep
-	cartItems := getUserCart(userID)
-	// for _, item := range cartItems {
-	// 	println(item.String())
-	// }
+	cartItems, err := getUserCart(userID)
+	if err != nil {
+		return out, fmt.Errorf("cart failure: %+v", err)
+	}
 	orderItems, err := prepOrderItems(cartItems, userCurrency)
 	if err != nil {
 		return out, fmt.Errorf("prepaer: %+v", err)
 	}
-	// orderItemsJSON, _ := orderItemsToString(orderItems)
-	// if err != nil {
-	// 	fmt.Println("Error converting OrderItems to string:", err)
-	// 	return nil,err
-	// }
-	// fmt.Println("OrderItems as a JSON string:")
-	// fmt.Println(orderItemsJSON)
 	shippingUSD, err := quoteShipping(&address, cartItems)
 	if err != nil {
 		return out, fmt.Errorf("shipping quote failure: %+v", err)
 	}
-	// fmt.Println("Shipping in USD")
-	// fmt.Println(shippingUSD)
 	shippingPrice, err := convertCurrency(shippingUSD, userCurrency)
 	if err != nil {
 		return out, fmt.Errorf("failed to convert shipping cost to currency: %+v", err)
 	}
-	// fmt.Println("ShippingPrice")
-	// fmt.Println(shippingPrice)
 	out.shippingCostLocalized = shippingPrice
 	out.cartItems = cartItems
 	out.orderItems = orderItems
-	// fmt.Println("Order Prep Output")
-
-	// fmt.Println("Cart Items:")
-	// for _, item := range out.cartItems {
-	//     fmt.Printf("ProductID: %s, Quantity: %d", item.ProductId, item.Quantity)
-	// }
-
-	// fmt.Println("Shipping Cost Localized: %v", out.shippingCostLocalized)
 	return out, nil
 }
 
@@ -339,14 +320,11 @@ func quoteShipping(address *Address, items []*CartItem) (*Money, error) {
 		"Items":   itemsMap,
 	}
 	jsonBody, _ := json.Marshal(data)
-	//fmt.Println(string(jsonBody))
 	cmd := exec.Command("./shipping/main", string(jsonBody))
 	output, _ := cmd.CombinedOutput()
-	//fmt.Printf("Shipping: %s\n", output)
 	var response QuoteResponse
 	_ = json.Unmarshal([]byte(output), &response)
 	getQuoteResponse := response.GetQuoteResponse
-	//fmt.Printf("Currency Code: %s, Units: %d, Nanos: %d\n", getQuoteResponse.CostUSD.CurrencyCode, getQuoteResponse. CostUSD.Units, getQuoteResponse.CostUSD.Nanos)
 	resultMoney := &Money{
 		CurrencyCode: getQuoteResponse.CostUSD.CurrencyCode,
 		Units:        getQuoteResponse.CostUSD.Units,
@@ -369,32 +347,25 @@ func extractProductIDs(output string) []string {
 	return productIDs
 }
 
-func getUserCart(userID string) []*CartItem {
+func getUserCart(userID string) ([]*CartItem, error) {
 	request := map[string]interface{}{
 		"requestType": "get",
 		"UserID":      userID,
 	}
 	requestData, err := json.Marshal(request)
 	if err != nil {
-		//fmt.Println("Error marshaling JSON:", err)
-		return nil
+		return nil, err
 	}
 
 	jsonArg := string(requestData)
 	cmd := exec.Command("./cart/main", jsonArg)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		//fmt.Printf("Error executing CartService: %v\n", err)
-		return nil
+		return nil, err
 	}
-	//fmt.Printf("CartService output: %s\n", string(output))
-
-	// Extract product IDs from the output
 	outputString := string(output)
 	productIDs := extractProductIDs(outputString)
-	// for _, productID := range productIDs {
-	// 	fmt.Println(productID)
-	// }
+
 	var cartItems []*CartItem
 	for _, productID := range productIDs {
 		cartItem := &CartItem{
@@ -403,13 +374,8 @@ func getUserCart(userID string) []*CartItem {
 		}
 		cartItems = append(cartItems, cartItem)
 	}
-	return cartItems
+	return cartItems, nil
 }
-
-// func emptyUserCart(var userID) {
-// 	resp := os.system("..../CartService " + json.dumps({requestType: "empty", UserId: userID}))
-// 	return nil
-// }
 
 func GetProductId(m *CartItem) string {
 	if m != nil {
@@ -436,12 +402,7 @@ func prepOrderItems(items []*CartItem, userCurrency string) ([]*OrderItem, error
 		output, _ := cmd.CombinedOutput()
 		product := &Product{}
 		_ = json.Unmarshal(output, product)
-		// Print the JSON representation of the PriceUsd field
-		// fmt.Println("productcatalog")
-		// fmt.Println("Product Price (USD):", string(output))
 		price, err := convertCurrency(product.PriceUsd, userCurrency)
-		//fmt.Println("ConvertCurrencyOutput")
-		//fmt.Println(price)
 		if err != nil {
 			return nil, err
 		}
@@ -449,14 +410,6 @@ func prepOrderItems(items []*CartItem, userCurrency string) ([]*OrderItem, error
 			Item: item,
 			Cost: price}
 	}
-	// orderItemsJSON, err := orderItemsToString(out)
-	// if err != nil {
-	// 	fmt.Println("Error converting OrderItems to string:", err)
-	// 	return nil,err
-	// }
-
-	// fmt.Println("OrderItems as a JSON string:")
-	// fmt.Println(orderItemsJSON)
 	return out, nil
 }
 
@@ -464,11 +417,11 @@ func convertCurrency(from *Money, toCurrency string) (*Money, error) {
 	data := map[string]interface{}{
 		"type": "currency",
 		"body": map[string]interface{}{
-			"currency_code": "USD",
-			"nanos":         990000000,
+			"currency_code": from.CurrencyCode,
+			"nanos":         from.Nanos,
 			"requestType":   "convert",
 			"to_code":       "EUR",
-			"units":         19,
+			"units":         from.Units,
 		},
 	}
 	requestData, err := json.Marshal(data)
@@ -512,7 +465,6 @@ func convertCurrency(from *Money, toCurrency string) (*Money, error) {
 		Units:        int64(money.Units),
 		Nanos:        int32(money.Nanos),
 	}
-	//fmt.Print(moneyResult)
 	return moneyResult, nil
 
 }
@@ -595,7 +547,7 @@ func sendOrderConfirmation(email string, order *PlaceOrderResponse) string {
 	//fmt.Println(string(requestData))
 	url := "https://bmk46xska6uzj4hhlwpcnhrdsi0osfnf.lambda-url.us-east-2.on.aws/"
 	buf := bytes.NewBuffer(requestData)
-	result, _:= http.NewRequest("POST", url, buf)
+	result, _ := http.NewRequest("POST", url, buf)
 	result.Header.Set("Content-Type", "application/json")
 	resp, _ := httpClient.Do(result)
 	defer resp.Body.Close()
@@ -677,36 +629,6 @@ type CreditCardInfo struct {
 	CreditCardExpirationYear  int32  `json:"creditCardExpirationYear"`
 	CreditCardExpirationMonth int32  `json:"creditCardExpirationMonth"`
 }
-
-// func HandleLambdaEvent(myEvent MyEvent) (string,error) {
-// 	placeOrderRequest := &PlaceOrderRequest{
-// 		UserId:       myEvent.UserId,
-// 		UserCurrency: myEvent.UserCurrency,
-// 		Address: &Address{
-// 			StreetAddress: myEvent.Address.StreetAddress,
-// 			City:          myEvent.Address.City,
-// 			State:         myEvent.Address.State,
-// 			Country:       myEvent.Address.Country,
-// 			ZipCode:       myEvent.Address.ZipCode,
-// 		},
-// 		Email: myEvent.Email,
-// 		CreditCard: &CreditCardInfo{
-// 			CreditCardNumber:          myEvent.CreditCard.CreditCardNumber,
-// 			CreditCardCvv:             myEvent.CreditCard.CreditCardCvv,
-// 			CreditCardExpirationYear:  myEvent.CreditCard.CreditCardExpirationYear,
-// 			CreditCardExpirationMonth: myEvent.CreditCard.CreditCardExpirationMonth,
-// 		},
-// 	}
-// 	result,err := PlaceOrder(placeOrderRequest)
-// 	if err != nil {
-// 		return "",err
-// 	}
-//     return result,nil
-// }
-
-// func main() {
-//     lambda.Start(HandleLambdaEvent)
-// }
 
 func main() {
 	jsonArg := os.Args[1]
