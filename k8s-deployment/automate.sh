@@ -33,42 +33,9 @@ spec:
   - name: $dir-local-pv
     hostPath:
       path: $path
-      type: DirectoryOrCreate 
+      type: Directory
 
 
----
-
-kind: StorageClass
-apiVersion: storage.k8s.io/v1
-metadata:
-  name: $dir-local-storage
-provisioner: kubernetes.io/no-provisioner
-volumeBindingMode: WaitForFirstConsumer
-
-
----
-
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: $dir-local-pv
-spec:
-  capacity:
-    storage: $storage
-  accessModes:
-  - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Retain
-  storageClassName: $dir-local-storage
-  local:
-    path: $path
-  nodeAffinity:
-    required:
-      nodeSelectorTerms:
-      - matchExpressions:
-        - key: kubernetes.io/hostname
-          operator: In
-          values:
-          - $label
 EOF
 
 
@@ -91,6 +58,61 @@ echo $i
 
 cat << EOF > deployment-$i.yaml
 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $dir-deployment-$i-initialise
+spec:
+  containers:
+  - name: $dir-initialise
+    image: busybox
+    command:  ["/bin/sh", "-c", "ls && sleep 3600"]
+    volumeMounts:
+    - mountPath: /test
+      name: $dir-local-pv
+      readOnly: true
+  volumes:
+  - name: $dir-local-pv
+    hostPath:
+      path:  $path/deployment$i
+      type: DirectoryOrCreate 
+
+--- 
+
+
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: $dir-deployment-$i-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+
+
+---
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: $dir-deployment-$i-pv
+spec:
+  capacity:
+    storage: $storage
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: $dir-deployment-$i-storage
+  local:
+    path: $path/deployment$i
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - $label
+
+---
 
 kind: PersistentVolumeClaim
 apiVersion: v1
@@ -99,7 +121,7 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: $dir-local-storage
+  storageClassName: $dir-deployment-$i-storage
   resources:
     requests:
       storage: $size_pvc 
@@ -129,6 +151,10 @@ spec:
         - name: $dir-deployment-$i-local-persistent-storage
           persistentVolumeClaim:
             claimName: $dir-deployment-$i-pvc
+        - name: $dir-deployment-$i-local-pv
+          hostPath:
+            path: $path/deployment$i
+            type: DirectoryOrCreate 
       initContainers:
       - name: $dir-deployment-$i-init
         image: $image
