@@ -55,6 +55,11 @@ read image
 echo "size in pv?"
 read size_pvc
 echo $i
+echo "path in docker image to copy"
+read path_to_mount
+echo "port?"
+read port
+
 
 cat << EOF > deployment-$i.yaml
 
@@ -163,7 +168,7 @@ spec:
             mountPath: /mnt
         securityContext:
           runAsUser: 0  
-        command: ["sh", "-c", "cp -r /workspace/* /mnt/"]
+        command: ["sh", "-c", "cp -r /$path_to_mount/* /mnt/"]
       containers:
       - name: $dir-deployment-$i
         image: $image
@@ -173,7 +178,7 @@ spec:
         securityContext:
           runAsUser: 0  
         ports:
-        - containerPort: 8080
+        - containerPort: $port
 EOF
  ((i++))
 echo "do you have more deployments ?"

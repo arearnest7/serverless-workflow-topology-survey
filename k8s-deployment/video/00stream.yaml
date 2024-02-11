@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: video-stream
+  labels:
+    app: video-stream
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: video-stream
+  template:
+    metadata:
+      labels:
+        app: video-stream
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: k3d-multiserver-server-0
+      volumes:
+      - name: shared-volume
+        emptyDir:
+          medium: Memory
+      containers:
+      - name: video-stream
+        volumeMounts:
+        - name: shared-volume
+          mountPath: /pv
+        image: vasu1711/video-streaming:latest
+        env:
+        - name: DECODER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: DECODER_PORT
+          value: "5003"
+        - name: RECOG_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: RECOG_PORT
+          value: "5004"
+        securityContext:
+          runAsUser: 0  
+        ports:
+        - containerPort: 5002
+      - name: video-decod
+        volumeMounts:
+        - name: shared-volume
+          mountPath: /pv
+        image: vasu1711/video-decoder:latest
+        env:
+        - name: DECODER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: DECODER_PORT
+          value: "5003"
+        - name: RECOG_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: RECOG_PORT
+          value: "5004"
+        securityContext:
+          runAsUser: 0  
+        ports:
+        - containerPort: 5003
+      - name: video-recog
+        volumeMounts:
+        - name: shared-volume
+          mountPath: /pv
+        image: vasu1711/video-recog:latest
+        env:
+        - name: DECODER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: DECODER_PORT
+          value: "5003"
+        - name: RECOG_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: RECOG_PORT
+          value: "5004"
+        securityContext:
+          runAsUser: 0  
+        ports:
+        - containerPort: 5004
+
