@@ -5,6 +5,7 @@ import shutil
 import time
 import requests
 import mmap
+import glob
 app = Flask(__name__)
 
 @app.route('/')
@@ -24,8 +25,11 @@ def trigger():
             mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
             file_content = mm.read().decode()
         mm.close()
+        files_to_delete = glob.glob("../pv/*")
+        for file in files_to_delete:
+             os.remove(file)
         return file_content
-        
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5002)
 
