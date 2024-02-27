@@ -2,7 +2,7 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "docker" ]
+    branches: [ "docker", "dvasudha-patch-1" ]
 
 jobs:
   build:
