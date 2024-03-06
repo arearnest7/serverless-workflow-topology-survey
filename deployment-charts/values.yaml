@@ -1,0 +1,131 @@
+# replicaCount: 3
+
+autoscaling:
+  enabled: false
+
+# podAnnotations:
+#   example.com/annotation1: value1
+#   example.com/annotation2: value2
+
+# podLabels:
+#   app: example
+#   tier: backend
+
+# imagePullSecrets:
+#   - name: my-image-pull-secret
+
+# podSecurityContext:
+#   runAsUser: 1000
+#   fsGroup: 2000
+
+containers:
+  - name: container1
+    image:
+      repository: nginx
+      tag: latest
+    service:
+      port: 80
+      targetport: 
+  - name: container2
+    image:
+      repository: nginx
+      tag: latest
+    service:
+      port: 80
+  - name: container3
+    image:
+      repository: nginx
+      tag: latest
+    service:
+      port: 80
+
+
+
+volumes:
+  - name: data
+    emptyDir: {}
+
+nodeSelector: {}
+
+nodeName: my-node
+nodelabel: my-label
+
+affinity: {}
+#   nodeAffinity:
+#     requiredDuringSchedulingIgnoredDuringExecution:
+#       nodeSelectorTerms:
+#         - matchExpressions:
+#             - key: example.com/zone
+#               operator: In
+#               values:
+#                 - us-west1-a
+#                 - us-west1-b
+
+
+replicaCount: 1
+
+# image:
+#   repository: nginx
+#   pullPolicy: IfNotPresent
+#   # Overrides the image tag whose default is the chart appVersion.
+#   tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+
+
+
+
+resources: {}
+
+
+# livenessProbe:
+#   httpGet:
+#     path: /
+#     port: http
+# readinessProbe:
+#   httpGet:
+#     path: /
+#     port: http
+
+
+volumes: []
+# - name: foo
+#   secret:
+#     secretName: mysecret
+#     optional: false
+
+
+tolerations: []
+
+affinity: {}
+
+
+
+pv: 
+  enabled: false
+  nodeLabel: ""
+  storage: "2Gi"
+
+pvc: 
+  storage: "1Gi"

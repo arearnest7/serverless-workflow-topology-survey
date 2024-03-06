@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "deployment-charts.fullname" . }}
+  labels:
+    {{- include "deployment-charts.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "deployment-charts.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "deployment-charts.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+    {{- range $container := .Values.containers }}
+          - name: {{ $container.name }}
+            {{- if $container.securityContext }}
+            securityContext:
+              {{- toYaml $container.securityContext | nindent 12 }}
+            {{- end }}
+            image: "{{ $container.image.repository }}:{{ $container.image.tag }}"
+            imagePullPolicy: {{ $container.image.pullPolicy }}
+            ports:
+              - containerPort: {{ $container.service.port }}
+            {{- if $container.livenessProbe }}
+            livenessProbe:
+              {{- toYaml $container.livenessProbe | nindent 12 }}
+            {{- end }}
+            {{- if $container.readinessProbe }}
+            readinessProbe:
+              {{- toYaml $container.readinessProbe | nindent 12 }}
+            {{- end }}
+            {{- if $container.resources }}
+            resources:
+              {{- toYaml $container.resources | nindent 12 }}
+            {{- end }}
+            {{- with $container.volumeMounts }}
+            volumeMounts:
+              {{- toYaml . | nindent 12 }}
+            {{- end }}
+    {{- end }}
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml $.Values.nodeSelector | nindent 8 }}
+        {{- if $.Values.pv.enabled }}
+        kubernetes.io/hostname: {{ $.Values.nodeName }}
+        {{- end }}
+      {{- else }}
+      {{- if .Values.pv.enabled }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.nodeName }}
+      {{- end }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

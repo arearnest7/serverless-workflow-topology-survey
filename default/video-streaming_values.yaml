@@ -1,0 +1,73 @@
+replicaCount: 1
+
+containers:
+  - name: container1
+    image:
+      repository:  vasu1711/video-streaming
+      tag: latest
+    service:
+      port: 500
+      targetport: 
+
+
+
+
+volumes:
+  - name: data
+    emptyDir: {}
+
+
+
+
+
+
+
+
+# podAnnotations: {}
+# podLabels: {}
+
+# podSecurityContext: {}
+  # fsGroup: 2000
+
+# securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+
+
+
+
+# resources: {}
+
+
+# livenessProbe:
+#   httpGet:
+#     path: /
+#     port: http
+# readinessProbe:
+#   httpGet:
+#     path: /
+#     port: http
+
+
+
+
+# tolerations: []
+
+# affinity: {}
+
+
+
+# pv: 
+#   enabled: false
+#   nodeLabel: ""
+#   storage: "2Gi"
+
+# pvc: 
+#   storage: "1Gi"

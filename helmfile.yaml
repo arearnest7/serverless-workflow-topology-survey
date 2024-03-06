@@ -1,0 +1,14 @@
+values:
+  - ./default/releases.yaml
+
+releases:
+{{- range $release := .Values.releaseNames }}
+  - name: {{ $release }}
+    chart: ./deployment-charts
+    values:
+      - ./default/{{ $release }}_values.yaml
+{{- end }}
+
+
+#install helmfile 
+#helmfile -i apply, this will gave changes for review and subsequently apply

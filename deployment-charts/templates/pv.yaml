@@ -1,0 +1,45 @@
+{{- if .Values.pv.enabled}}
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: {{ include "deployment-charts.fullname" . }}
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "deployment-charts.fullname" . }}
+spec:
+  capacity:
+    storage:{{ .Values.pv.storage }}
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ include "deployment-charts.fullname" . }}
+  local:
+    path: $path/deployment$i
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - {{ .Values.nodeName }}
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ include "deployment-charts.fullname" . }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{ include "deployment-charts.fullname" . }}
+  resources:
+    requests:
+      storage: {{ .Values.pvc.storage }}
+{{- end}}

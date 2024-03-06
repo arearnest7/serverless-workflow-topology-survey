@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "deployment-charts.fullname" . }}
+  labels:
+    {{- include "deployment-charts.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    {{- range $container := .Values.containers }}
+    {{- if $container.service.port }}
+    - name: {{ $container.name }}-http
+      port: {{ $container.service.port }}
+      targetPort: {{ $container.service.targetPort | default $container.service.port}}
+      protocol: TCP
+    {{- end }}
+    {{- end }}
+  selector:
+    {{- include "deployment-charts.selectorLabels" . | nindent 4 }}
